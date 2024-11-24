@@ -92,55 +92,60 @@ def linear_regression_homomorphic(encrypted_data):
 
 def prepare_input(row):
     # Convert row to list and ensure it's of length 4
-    input_list = row.tolist()
+    print(row,type(row))
+    input_list = row.to_list()
+
     if len(input_list) < 4:
         input_list += [0] * (4 - len(input_list))  # Pad with zeros if less than 4
     elif len(input_list) > 4:
         input_list = input_list[:4]  # Trim if more than 4
+    print(input_list,type(input_list),type(input_list[0]))
     return input_list
 
 
 def sum_columns(df):
-
     params, _ = init_ckks_parameters()
     evaluator = CKKSEvaluator(params)
 
-    # Initialize an empty DataFrame for results
-    result_df = pd.DataFrame(columns=df.columns)
-    
+    # Initialize a list to hold cumulative sums for each column
+    cumulative_sums = {}
+
     # Iterate over each column in the DataFrame
     for column in df.columns:
         # Extract the column values as a list
         column_values = df[column].tolist()
-        print(type(column_values[0]),column_values[0])
-
+        print(type(column_values[0]), column_values[0])
 
         first_val = json.loads(column_values[0].replace("'", '"'))
-        # Reset cumulative sum for the current column
-        c0_deg,c0_coef = Polynomial.parse_polynomial(first_val['c0'])
-        c1_deg,c1_coef = Polynomial.parse_polynomial(first_val['c1'])
-
-        c0 = Polynomial(c0_deg+1, c0_coef)
-        c1 = Polynomial(c1_deg+1, c1_coef)
-
-        cumulative_sum = Ciphertext(c0,c1)
         
-        for i in range(1,len(column_values)):
-            val =  json.loads(column_values[i].replace("'", '"'))
-            c0_deg,c0_coef = Polynomial.parse_polynomial(val['c0'])
-            c1_deg,c1_coef = Polynomial.parse_polynomial(val['c1'])
+        # Reset cumulative sum for the current column
+        c0_deg, c0_coef = Polynomial.parse_polynomial(first_val['c0'])
+        c1_deg, c1_coef = Polynomial.parse_polynomial(first_val['c1'])
 
-            c0 = Polynomial(c0_deg+1, c0_coef)
-            c1 = Polynomial(c1_deg+1, c1_coef)
+        c0 = Polynomial(c0_deg + 1, c0_coef)
+        c1 = Polynomial(c1_deg + 1, c1_coef)
 
-            value = Ciphertext(c0,c1)
+        cumulative_sum = Ciphertext(c0, c1)
+        
+        for i in range(1, len(column_values)):
+            val = json.loads(column_values[i].replace("'", '"'))
+            c0_deg, c0_coef = Polynomial.parse_polynomial(val['c0'])
+            c1_deg, c1_coef = Polynomial.parse_polynomial(val['c1'])
+
+            c0 = Polynomial(c0_deg + 1, c0_coef)
+            c1 = Polynomial(c1_deg + 1, c1_coef)
+
+            value = Ciphertext(c0, c1)
             # Add to cumulative sum using your custom addition function
             cumulative_sum = evaluator.add(cumulative_sum, value)
         
-        # Append the cumulative sum to the result DataFrame
-        result_df[column] = pd.Series(str(cumulative_sum.to_dict()))
-    
-    return result_df
+        # Store the cumulative sum in the dictionary
+        cumulative_sums[column] = str(cumulative_sum.to_dict())
+
+    # Append the cumulative sums as a new row to the existing DataFrame
+    df.loc[len(df)] = cumulative_sums  # Append as a new row
+
+    return df  # Return the updated DataFrame with cumulative sums
 
 def mul_columns(df):
 
