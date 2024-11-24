@@ -6,7 +6,7 @@ import os
 from util.public_key import PublicKey
 from util.secret_key import SecretKey
 from util.polynomial import Polynomial
-from lattice_crypto import generate_keys, encrypt_ckks, sum_columns, prepare_input, decrypt_columns
+from lattice_crypto import generate_keys, encrypt_ckks, sum_columns, prepare_input, decrypt_columns, process_dataframe
 import json
 
 app = Flask(__name__)
@@ -31,6 +31,7 @@ def generate_key_route():
         "public_key": public_key.to_dict(),
         "secret_key": secret_key.__str__(),
     })
+
 @app.route('/upload-file', methods=['POST'])
 def upload_file():
     file = request.files['file']
@@ -53,11 +54,22 @@ def upload_file():
     df = pd.read_csv(file)
     df = df.apply(pd.to_numeric, errors="coerce").fillna(0)
 
-    # Encrypt the data
-    encrypted_df = df.apply(lambda row: encrypt_ckks(prepare_input(row), public_key, secret_key), axis=1)
-    encrypted_file_path = os.path.join(DATA_DIR, f"{file.filename}")
+    # Encrypt all columns
+    encrypted_data = []
     
+    for index, row in df.iterrows():
+        encrypted_row = {}
+        for column in df.columns:
+            # Encrypt each column value
+            encrypted_value = encrypt_ckks(prepare_input(row[column]), public_key, secret_key)
+            encrypted_row[column] = encrypted_value
+        encrypted_data.append(encrypted_row)
+
+    # Convert list of encrypted rows to DataFrame
+    encrypted_df = pd.DataFrame(encrypted_data)
+
     # Save the encrypted data to a CSV file
+    encrypted_file_path = os.path.join(DATA_DIR, f"{file.filename}")
     encrypted_df.to_csv(encrypted_file_path, index=False)
 
     # Prepare to append filename and secret key to secret_key_df
@@ -106,9 +118,10 @@ def decrypt_file(filename):
     
     decrypt_df = decrypt_columns(df,secret_key)
     print(secret_key)
+    processed_df = process_dataframe(decrypt_df)
     decrtpted_file_path = os.path.join(DECRYPTED_DIR, f"{filename}")
     
-    decrypt_df.to_csv(decrtpted_file_path, index=False)
+    processed_df.to_csv(decrtpted_file_path, index=False)
     return jsonify({"message": "File decrypted and saved successfully."})
 
 @app.route('/files/<folder>', methods=['GET'])
