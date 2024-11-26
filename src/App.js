@@ -15,7 +15,7 @@ function App() {
   // Fetch available files from the server
   const fetchAvailableFiles = async (folder) => {
     try {
-      const response = await axios.get(`http://localhost:8080/files/${folder}`);
+      const response = await axios.get(`http://localhost:8080/api/files/${folder}`);
       setAvailableFiles(response.data);
     } catch (error) {
       console.error("Error fetching files:", error);
@@ -24,7 +24,7 @@ function App() {
 
   // Generate BFV keys
   const generateKeys = async () => {
-    const response = await axios.post("http://localhost:8080/generate-key");
+    const response = await axios.post("http://localhost:8080/api/generate-key");
     setPublicKey(response.data.public_key);
     setSecretKey(response.data.secret_key);
   };
@@ -46,7 +46,7 @@ function App() {
     formData.append("secret_key", JSON.stringify(secretKey));
 
     try {
-      await axios.post("http://localhost:8080/upload-file", formData);
+      await axios.post("http://localhost:8080/api/upload-file", formData);
       alert("File uploaded and encrypted successfully.");
     } catch (error) {
       console.error("Error during encryption:", error);
@@ -61,7 +61,7 @@ function App() {
     }
 
     try {
-      const response = await axios.post(`http://localhost:8080/analyze/${file}`);
+      const response = await axios.post(`http://localhost:8080/api/analyze/${file}`);
       setEncryptedData(response.data);
       alert("Analysis completed successfully.");
     } catch (error) {
@@ -77,7 +77,7 @@ function App() {
     }
 
     try {
-      const response = await axios.post(`http://localhost:8080/decrypt/${file}`, { secret_key: secretKey });
+      const response = await axios.post(`http://localhost:8080/api/decrypt/${file}`, { secret_key: secretKey });
       setDecryptedData(response.data); // Assuming response contains decrypted data
       setDecryptedFileName(`${file}`); // Set filename for download
       alert("Decryption completed successfully.");
@@ -97,7 +97,7 @@ function App() {
 
   return (
     <div className="App">
-      <h1>CKKS-based Linear Regression</h1>
+      <h1>CKKS-based Data Analysis</h1>
 
       {/* Navigation */}
       <nav>
@@ -113,8 +113,11 @@ function App() {
           <button onClick={generateKeys}>Generate Keys</button>
           <div>
             <h3>Public Key:</h3>
-            <pre>p0: {publicKey.p0}</pre>
-            <pre>p1: {publicKey.p1}</pre>
+            <center>
+          <div style={{ maxWidth: '500px', maxHeight: '200px', overflow: 'auto', border: '1px solid #ccc', padding: '5px' }}>
+            <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>p0: {publicKey.p0}</pre>
+            <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>p1: {publicKey.p1}</pre>
+        </div></center>
             <h3>Secret Key:</h3>
             <pre>{secretKey}</pre>
           </div>
@@ -166,7 +169,7 @@ function App() {
 
               {/* Provide download option */}
               {/* Assuming decrypted data is saved in the backend */}
-              <a href={`http://localhost:8080/download/${decryptedFileName}`} download>
+              <a href={`http://localhost:8080/api/download/${decryptedFileName}`} download>
                 Download Decrypted Data
               </a>
             </>
