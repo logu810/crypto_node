@@ -15,7 +15,7 @@ function App() {
   // Fetch available files from the server
   const fetchAvailableFiles = async (folder) => {
     try {
-      const response = await axios.get(`http://localhost:8080/api/files/${folder}`);
+      const response = await axios.get(`http://13.71.92.113/api/files/${folder}`);
       setAvailableFiles(response.data);
     } catch (error) {
       console.error("Error fetching files:", error);
@@ -24,7 +24,7 @@ function App() {
 
   // Generate BFV keys
   const generateKeys = async () => {
-    const response = await axios.post("http://localhost:8080/api/generate-key");
+    const response = await axios.post("http://13.71.92.113/api/generate-key");
     setPublicKey(response.data.public_key);
     setSecretKey(response.data.secret_key);
   };
@@ -46,7 +46,7 @@ function App() {
     formData.append("secret_key", JSON.stringify(secretKey));
 
     try {
-      await axios.post("http://localhost:8080/api/upload-file", formData);
+      await axios.post("http://13.71.92.113/api/upload-file", formData);
       alert("File uploaded and encrypted successfully.");
     } catch (error) {
       console.error("Error during encryption:", error);
@@ -61,7 +61,7 @@ function App() {
     }
 
     try {
-      const response = await axios.post(`http://localhost:8080/api/analyze/${file}`);
+      const response = await axios.post(`http://13.71.92.113/api/analyze/${file}`);
       setEncryptedData(response.data);
       alert("Analysis completed successfully.");
     } catch (error) {
@@ -77,7 +77,7 @@ function App() {
     }
 
     try {
-      const response = await axios.post(`http://localhost:8080/api/decrypt/${file}`, { secret_key: secretKey });
+      const response = await axios.post(`http://13.71.92.113/api/decrypt/${file}`, { secret_key: secretKey });
       setDecryptedData(response.data); // Assuming response contains decrypted data
       setDecryptedFileName(`${file}`); // Set filename for download
       alert("Decryption completed successfully.");
@@ -169,7 +169,7 @@ function App() {
 
               {/* Provide download option */}
               {/* Assuming decrypted data is saved in the backend */}
-              <a href={`http://localhost:8080/api/download/${decryptedFileName}`} download>
+              <a href={`http://13.71.92.113/api/download/${decryptedFileName}`} download>
                 Download Decrypted Data
               </a>
             </>
