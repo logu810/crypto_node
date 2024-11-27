@@ -6,8 +6,9 @@ import os
 from util.public_key import PublicKey
 from util.secret_key import SecretKey
 from util.polynomial import Polynomial
-from lattice_crypto import generate_keys, encrypt_ckks, sum_columns, prepare_input, decrypt_columns, process_dataframe
+from df_crypto import generate_keys, encrypt_ckks, sum_columns, prepare_input, decrypt_columns, process_dataframe
 import json
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -38,12 +39,11 @@ def upload_file():
     public_key_data = json.loads(request.form['public_key'])
     secret_key_data = json.loads(request.form['secret_key'])
 
+    # Parse the public and secret keys
     p0_deg, p0_coef = Polynomial.parse_polynomial(public_key_data['p0'])
     p1_deg, p1_coef = Polynomial.parse_polynomial(public_key_data['p1'])
-
     p0 = Polynomial(p0_deg + 1, p0_coef)
     p1 = Polynomial(p1_deg + 1, p1_coef)
-
     public_key = PublicKey(p0, p1)
 
     sec_deg, sec_coef = Polynomial.parse_secret_polynomial(secret_key_data)
@@ -54,45 +54,77 @@ def upload_file():
     df = pd.read_csv(file)
     df = df.apply(pd.to_numeric, errors="coerce").fillna(0)
 
-    # Encrypt all columns
+    # Metrics initialization
     encrypted_data = []
-    
+    total_encryption_time = 0
+    total_ciphertext_size = 0
+    num_rows = len(df)
+    num_columns = len(df.columns)
+
+    # Encrypt all columns
     for index, row in df.iterrows():
         encrypted_row = {}
         for column in df.columns:
+            start_time = time.time()
+
             # Encrypt each column value
             encrypted_value = encrypt_ckks(prepare_input(row[column]), public_key, secret_key)
+
+            elapsed_time = time.time() - start_time
+            total_encryption_time += elapsed_time
+
+            # Calculate ciphertext size
+            ciphertext_size = len(str(encrypted_value).encode('utf-8'))
+            total_ciphertext_size += ciphertext_size
+
             encrypted_row[column] = encrypted_value
         encrypted_data.append(encrypted_row)
 
-    # Convert list of encrypted rows to DataFrame
+    # Convert encrypted data to DataFrame
     encrypted_df = pd.DataFrame(encrypted_data)
 
-    # Save the encrypted data to a CSV file
+    # Calculate metrics
+    avg_encryption_time_per_row = total_encryption_time / num_rows
+    avg_encryption_time_per_value = total_encryption_time / (num_rows * num_columns)
+    avg_ciphertext_size_per_row = total_ciphertext_size / num_rows
+    # plaintext_csv_size = os.path.getsize(file) / 1024  # KB
+    ciphertext_csv_size = sum(encrypted_df.applymap(lambda x: len(str(x).encode('utf-8'))).sum()) / 1024  # KB
+
+    # Print metrics
+    print(f"Total encryption time: {total_encryption_time:.2f} seconds")
+    print(f"Average encryption time per row: {avg_encryption_time_per_row:.4f} seconds/row")
+    print(f"Average encryption time per value: {avg_encryption_time_per_value:.6f} seconds/value")
+    print(f"Average ciphertext size per row: {avg_ciphertext_size_per_row:.2f} bytes/row")
+    # print(f"Plaintext CSV size: {plaintext_csv_size:.2f} KB")
+    print(f"Ciphertext CSV size: {ciphertext_csv_size:.2f} KB")
+
+    # Save encrypted data to a CSV file
     encrypted_file_path = os.path.join(DATA_DIR, f"{file.filename}")
     encrypted_df.to_csv(encrypted_file_path, index=False)
 
-    # Prepare to append filename and secret key to secret_key_df
+    # Save secret key and filename mapping
     secret_key_df_path = os.path.join(SECRET_DIR, 'secret_keys.csv')
-
-    # Check if the CSV already exists
     if os.path.exists(secret_key_df_path):
-        # Load existing data
         secret_key_df = pd.read_csv(secret_key_df_path)
     else:
-        # Create a new DataFrame if it doesn't exist
         secret_key_df = pd.DataFrame(columns=['filename', 'secret_key'])
 
-    # Create a new DataFrame for the new entry
     new_entry_df = pd.DataFrame({'filename': [file.filename], 'secret_key': [sec.__str__()]})
-
-    # Concatenate the existing DataFrame with the new entry
     secret_key_df = pd.concat([secret_key_df, new_entry_df], ignore_index=True)
-
-    # Save updated DataFrame back to CSV
     secret_key_df.to_csv(secret_key_df_path, index=False)
 
-    return jsonify({"message": "File encrypted and saved successfully."})
+    # Return response with metrics
+    return jsonify({
+        "message": "File encrypted and saved successfully.",
+        "metrics": {
+            "total_encryption_time": f"{total_encryption_time:.2f} seconds",
+            "avg_encryption_time_per_row": f"{avg_encryption_time_per_row:.4f} seconds/row",
+            "avg_encryption_time_per_value": f"{avg_encryption_time_per_value:.6f} seconds/value",
+            "avg_ciphertext_size_per_row": f"{avg_ciphertext_size_per_row:.2f} bytes/row",
+            # "plaintext_csv_size": f"{plaintext_csv_size:.2f} KB",
+            "ciphertext_csv_size": f"{ciphertext_csv_size:.2f} KB"
+        }
+    })
 
 @app.route('/analyze/<filename>', methods=['POST'])
 def analyze_file(filename):
